@@ -25,11 +25,6 @@ func (h *handler) Modify(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 
 	if err != nil {
@@ -43,8 +38,6 @@ func (h *handler) Modify(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// TODO: GET ID
 
 	rw.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(u)
