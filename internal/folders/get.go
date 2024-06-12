@@ -2,6 +2,7 @@ package folders
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -16,17 +17,30 @@ func (h *handler) Get(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := Get(h.db, int64(id))
+	f, err := GetFolder(h.db, int64(id))
 
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	//TODO: get content
+	c, err := GetFolderContent(h.db, int64(id))
+
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fc := FolderContent{
+		Folder:  *f,
+		Content: c,
+	}
+
+	rw.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(fc)
 }
 
-func Get(db *sql.DB, folderID int64) (*Folder, error) {
+func GetFolder(db *sql.DB, folderID int64) (*Folder, error) {
 	stmt := `select * from "folders" where id=$1`
 	row := db.QueryRow(stmt, folderID)
 
@@ -38,4 +52,50 @@ func Get(db *sql.DB, folderID int64) (*Folder, error) {
 	}
 
 	return &f, nil
+}
+
+func getSubFolder(db *sql.DB, folderID int64) ([]Folder, error) {
+	stmt := `select * from "folders" where "parent_id"=$1 and "deleted"=false`
+	rows, err := db.Query(stmt, folderID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	f := make([]Folder, 0)
+
+	for rows.Next() {
+		var folder Folder
+		err := rows.Scan(&folder.ID, &folder.ParentID, &folder.Name, &folder.CreatedAt, &folder.ModifiedAt, &folder.Deleted)
+		if err != nil {
+			continue
+		}
+
+		f = append(f, folder)
+	}
+
+	return f, nil
+}
+
+func GetFolderContent(db *sql.DB, folderID int64) ([]FolderResource, error) {
+	subFolders, err := getSubFolder(db, folderID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fr := make([]FolderResource, 0, len(subFolders))
+	for _, sf := range subFolders {
+		r := FolderResource{
+			ID:         sf.ID,
+			Name:       sf.Name,
+			Type:       "directory",
+			CreatedAt:  sf.CreatedAt,
+			ModifiedAt: sf.ModifiedAt,
+		}
+
+		fr = append(fr, r)
+	}
+
+	return fr, nil
 }
