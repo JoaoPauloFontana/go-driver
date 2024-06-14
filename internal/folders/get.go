@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/JoaoPauloFontana/drive/internal/files"
 	"github.com/go-chi/chi"
 )
 
@@ -54,7 +55,7 @@ func GetFolder(db *sql.DB, folderID int64) (*Folder, error) {
 	return &f, nil
 }
 
-func getSubFolder(db *sql.DB, folderID int64) ([]Folder, error) {
+func getSubFolders(db *sql.DB, folderID int64) ([]Folder, error) {
 	stmt := `select * from "folders" where "parent_id"=$1 and "deleted"=false`
 	rows, err := db.Query(stmt, folderID)
 
@@ -78,7 +79,7 @@ func getSubFolder(db *sql.DB, folderID int64) ([]Folder, error) {
 }
 
 func GetFolderContent(db *sql.DB, folderID int64) ([]FolderResource, error) {
-	subFolders, err := getSubFolder(db, folderID)
+	subFolders, err := getSubFolders(db, folderID)
 
 	if err != nil {
 		return nil, err
@@ -92,6 +93,24 @@ func GetFolderContent(db *sql.DB, folderID int64) ([]FolderResource, error) {
 			Type:       "directory",
 			CreatedAt:  sf.CreatedAt,
 			ModifiedAt: sf.ModifiedAt,
+		}
+
+		fr = append(fr, r)
+	}
+
+	folderFiles, err := files.List(db, folderID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, f := range folderFiles {
+		r := FolderResource{
+			ID:         f.ID,
+			Name:       f.Name,
+			Type:       f.Type,
+			CreatedAt:  f.CreatedAt,
+			ModifiedAt: f.ModifiedAt,
 		}
 
 		fr = append(fr, r)
